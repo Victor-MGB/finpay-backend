@@ -1,0 +1,45 @@
+# Environment variables
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-error.log
+
+# Logs
+logs/
+*.log
+logs/**/*.log
+debug.log
+
+# Build files
+dist/
+build/
+
+# Temporary files
+.tmp/
+.DS_Store
+Thumbs.db
+
+# IDE-specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+
+# Database-related files
+*.sqlite
+*.sqlite3
+*.db
+dump.sql
+
+# Testing coverage
+coverage/
+
+# Process manager files (like PM2)
+pm2.log
