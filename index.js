@@ -10,6 +10,8 @@ const connectDB = require("./src/config/db");
 const morgan = require("morgan");
 const winston = require("winston");
 
+require("./src/cron/cronjobs")
+
 const app = express();
 
 // 🟢 Logger Setup
@@ -64,6 +66,10 @@ connectDB();
 // Routes
 app.use("/api/auth", require("./src/routes/authRoutes"));
 app.use("/api/users", require("./src/routes/userRoutes"));
+app.use("/api/kyc", require("./src/routes/kycRoutes"));
+app.use("/api/invoice", require("./src/routes/invoiceTransactionRoutes"));
+app.use("/api/admin", require("./src/routes/adminRoutes"));
+app.use("/api/wallet", require("./src/routes/walletRoutes"));
 
 // 🟢 Error Handling Middleware
 app.use((err, req, res, next) => {

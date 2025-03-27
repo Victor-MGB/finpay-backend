@@ -1,5 +1,7 @@
 const express = require("express");
-const { getAllUsers, getUserById, updateUser, deleteUser, getSecurityLogsByUser } = require("../controllers/userController");
+const { getAllUsers, getUserById, updateUser, deleteUser, updateUserStatus } = require("../controllers/userController");
+const {authMiddleware} = require("../middlewares/authMiddleware");
+const authorization = require("../middlewares/roleMiddleware");
 
 // Create a new router
 const router = express.Router();
@@ -8,16 +10,16 @@ const router = express.Router();
 router.get("/users", getAllUsers);
 
 // Get single user
-router.get("/users/:id", getUserById);
+router.get("/users/:id", authMiddleware, getUserById);
 
 // Update user
-router.put("/users/:id", updateUser);
+router.put("/users/:id", authMiddleware, updateUser);
 
 // Delete user
 router.delete("/users/:id", deleteUser);
 
-//get user security logs
-router.get("/security-logs/:userId", getSecurityLogsByUser)
+// Update user status
+router.patch("/users/status", authorization, updateUserStatus);
 
 // Export the router
 module.exports = router;
