@@ -4,7 +4,9 @@ const {
   verifyOTPFromPhoneNumber,
   resendOTP,
   loginUser,
+  enableBiometric,
 } = require("../controllers/authController");
+const { authMiddleware } = require("../middlewares/authMiddleware"); // assumes you have authentication middleware
 const router = express.Router();
 
 // Register endpoint
@@ -18,4 +20,7 @@ router.post("/resend-otp", resendOTP);
 
 //Login endpoint
 router.post("/login", loginUser);
+
+router.patch('/users/biometric', authMiddleware, enableBiometric);
+
 module.exports = router;

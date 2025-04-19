@@ -10,7 +10,7 @@ const connectDB = require("./src/config/db");
 const morgan = require("morgan");
 const winston = require("winston");
 
-require("./src/cron/cronjobs")
+require("./src/cron/cronjobs");
 
 const app = express();
 
@@ -67,9 +67,32 @@ connectDB();
 app.use("/api/auth", require("./src/routes/authRoutes"));
 app.use("/api/users", require("./src/routes/userRoutes"));
 app.use("/api/kyc", require("./src/routes/kycRoutes"));
-app.use("/api/invoice", require("./src/routes/invoiceTransactionRoutes"));
+app.use("/api/invoice", require("./src/routes/invoiceRoutes"));
 app.use("/api/admin", require("./src/routes/adminRoutes"));
 app.use("/api/wallet", require("./src/routes/walletRoutes"));
+app.use("/api/payments", require("./src/routes/paymentRoutes"));
+app.use("/api/transactions", require("./src/routes/transactionRoutes"));
+app.use("/api/transaction-fee", require("./src/routes/transactionFeeRoutes"));
+app.use("/api/payouts", require("./src/routes/payoutRoutes"));
+app.use("/api/merchant", require("./src/routes/merchantRoutes"));
+app.use("/api/virtual", require("./src/routes/virtualCardRoutes"));
+app.use("/api/currency", require("./src/routes/currencyRoutes"));
+app.use("/api/notification", require("./src/routes/notificationRoutes"));
+app.use("/api/security", require("./src/routes/securityRoutes"));
+app.use("/api/bill", require("./src/routes/billPaymentRoutes"));
+app.use("/api/recharge", require("./src/routes/rechargeRoutes"));
+app.use("/api/cheque", require("./src/routes/chequeBookRequest"));
+app.use("/api/locations", require("./src/routes/locationRoutes"));
+app.use("/api/statements", require("./src/routes/statementRoutes"));
+app.use("/api/loans", require("./src/routes/loanRoutes"));
+app.use("api/credit", require("./src/routes/creditCardRoutes"));
+app.use("api/investment", require("./src/routes/investmentRoutes"));
+app.use("api/sip", require("./src/routes/sipRoutes"));
+app.use("api/insurance", require("./src/routes/insuranceRoutes"));
+app.use("api/tax", require("./src/routes/taxRoutes"));
+
+//stripe webhook
+app.use("/api/stripe", require("./src/routes/stripeWebhook"));
 
 // 🟢 Error Handling Middleware
 app.use((err, req, res, next) => {

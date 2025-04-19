@@ -399,3 +399,114 @@ async function sendLoginAlert(email, ip, device){
 
   await transport.sendMail(mailOptions);
 }
+
+// PATCH /users/biometric
+exports.enableBiometric = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { enable } = req.body;
+
+    // Validate the input
+    if (typeof enable !== 'boolean') {
+      return res.status(400).json({ message: "Invalid input for 'enable'" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Update biometricAuth based on 'enable'
+    user.biometricAuth = enable;
+
+    // Save the user document with the updated biometricAuth status
+    await user.save();
+
+    // Log the biometric login action in SecurityLog for audit purposes
+    const logDetails = enable ? "Biometric login enabled" : "Biometric login disabled";
+
+    await SecurityLog.create({
+      userId: userId,
+      action: logDetails,
+      status: "success", // Assuming this is a successful action
+      ipAddress: req.ip, // Get the user's IP address
+      userAgent: req.headers['user-agent'], // Get the user's browser info
+      location: user.location || "Unknown", // Optional: Use a geolocation lookup if available
+      timestamp: new Date(),
+      details: logDetails, // Additional information
+    });
+
+    return res.status(200).json({
+      message: enable ? "Biometric login enabled" : "Biometric login disabled",
+    });
+  } catch (error) {
+    console.error("Biometric enable/disable error:", error);
+    
+    // Log failure in SecurityLog if an error occurs
+    await SecurityLog.create({
+      userId: req.user.id,
+      action: "Biometric enable/disable attempt",
+      status: "failure",
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      location: req.user.location || "Unknown",
+      timestamp: new Date(),
+      details: error.message, // Store the error message in details
+    });
+
+    return res.status(500).json({ message: "Internal server error", error: error.message });
+  }
+};
+
+exports.updateAlerts = async (req, res) => {
+  try {
+    const { alerts } = req.body;
+    const userId = req.user.id;
+
+    const validTypes = ["low_balance", "transaction", "bill_due"];
+
+    if (!Array.isArray(alerts) || alerts.length === 0) {
+      return res.status(400).json({ message: "Alerts array is required" });
+    }
+
+    for (const alert of alerts) {
+      const { type, threshold, active } = alert;
+
+      if (!validTypes.includes(type)) {
+        return res.status(400).json({ message: `Invalid alert type: ${type}` });
+      }
+
+      if (typeof threshold !== "number" || typeof active !== "boolean") {
+        return res.status(400).json({ message: `Invalid alert structure for type: ${type}` });
+      }
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Process each alert
+    for (const alert of alerts) {
+      const existingIndex = user.alerts.findIndex(a => a.type === alert.type);
+
+      if (existingIndex !== -1) {
+        // Update existing alert
+        user.alerts[existingIndex].threshold = alert.threshold;
+        user.alerts[existingIndex].active = alert.active;
+      } else {
+        // Add new alert
+        user.alerts.push({
+          type: alert.type,
+          threshold: alert.threshold,
+          active: alert.active,
+        });
+      }
+    }
+
+    await user.save();
+
+    return res.status(200).json({ message: "Alerts updated" });
+  } catch (error) {
+    console.error("Error updating alerts:", error);
+    return res.status(500).json({ message: "Internal server error", error: error.message });
+  }
+};
