@@ -97,3 +97,60 @@ exports.getChequeBookRequests = async (req, res) => {
   }
 };
   
+
+exports.updateChequeBookRequestStatus = async (req, res) => {
+  const adminId = req.user.id; // Assuming `req.user` is populated after authentication
+  const { id } = req.params;
+  const { status } = req.body;
+
+  try {
+    // Check if the user is an admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Forbidden. Admins only.' });
+    }
+
+    // Validate status
+    const allowedStatuses = ['approved', 'delivered'];
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({ message: 'Invalid status. Allowed: approved, delivered.' });
+    }
+
+    // Find the cheque book request
+    const chequeBookRequest = await ChequeBookRequest.findById(id);
+    if (!chequeBookRequest) {
+      return res.status(404).json({ message: 'Cheque book request not found.' });
+    }
+
+    // Update fields
+    chequeBookRequest.status = status;
+    if (status === 'delivered') {
+      chequeBookRequest.deliveredAt = new Date();
+    }
+    await chequeBookRequest.save();
+
+    // Notify user (simple email)
+    const user = await User.findById(chequeBookRequest.userId);
+    if (user && user.email) {
+      await sendEmail({
+        to: user.email,
+        subject: `Cheque Book Request ${status}`,
+        text: `Hello ${user.firstName || 'User'}, your cheque book request has been ${status}.`
+      });
+    }
+
+    // Log action in AuditLog
+    await AuditLog.create({
+      performed_by: adminId,
+      action: `Cheque book request ${status}`,
+      entity_type: 'User',
+      entity_id: chequeBookRequest.userId,
+      details: `Cheque book request ID ${chequeBookRequest._id} updated to ${status}`,
+    });
+
+    return res.status(200).json({ message: 'Request updated successfully.' });
+
+  } catch (error) {
+    console.error('Error updating cheque book request:', error);
+    return res.status(500).json({ message: 'Server error. Please try again later.' });
+  }
+};

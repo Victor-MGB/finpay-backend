@@ -6,6 +6,7 @@ const {Wallet,
     AuditLog,
     TaxPayment
 } = require("../models/Users");
+const cloudinary = require("../config/cloudinary"); // Import cloudinary config
 
 exports.createTaxPayment = async (req, res) => {
     const session = await mongoose.startSession();
@@ -134,5 +135,114 @@ exports.createTaxPayment = async (req, res) => {
       await session.abortTransaction();
       session.endSession();
       return res.status(500).json({ message: "Internal Server Error", error: error.message });
+    }
+  };
+
+
+  // Controller: Upload Tax Document
+exports.uploadTaxDocument = async (req, res) => {
+    try {
+      const userId = req.user._id;
+      let { type, documentUrl, taxYear } = req.body;
+  
+      // Validate type
+      if (!["receipt", "return"].includes(type)) {
+        return res.status(400).json({ message: "Invalid type. Must be 'receipt' or 'return'." });
+      }
+  
+      // Validate taxYear
+      if (!taxYear || typeof Number(taxYear) !== 'number') {
+        return res.status(400).json({ message: "Invalid taxYear." });
+      }
+  
+      // Handle file upload if file is sent
+      if (req.file) {
+        const result = await cloudinary.uploader.upload(req.file.path, {
+          folder: "tax_documents"
+        });
+        documentUrl = result.secure_url;
+      }
+  
+      if (!documentUrl) {
+        return res.status(400).json({ message: "Document URL is required." });
+      }
+  
+      // Save Tax Document
+      const taxDocument = new TaxDocument({
+        userId,
+        type,
+        documentUrl,
+        taxYear,
+      });
+      await taxDocument.save();
+  
+      // Log Audit
+      await AuditLog.create({
+        performed_by: userId,
+        action: `Uploaded a tax ${type}`,
+        entity_type: "TaxDocument",
+        entity_id: taxDocument._id,
+        details: `Uploaded tax ${type} for year ${taxYear}`
+      });
+  
+      return res.status(201).json({ documentId: taxDocument._id });
+  
+    } catch (error) {
+      console.error("Tax document upload error:", error);
+      return res.status(500).json({ message: "Internal server error." });
+    }
+  };
+
+  // Controller: Get Tax Payments
+exports.getTaxPayments = async (req, res) => {
+    try {
+      const userId = req.user._id;
+      const { taxYear, status } = req.query;
+  
+      // Build query
+      let query = { userId };
+      if (taxYear) query.taxYear = taxYear;
+      if (status) query.status = status;
+  
+      const payments = await TaxPayment.find(query)
+        .populate('transactionId')
+        .select('_id taxType amount taxYear status') // Only return necessary fields
+        .exec();
+  
+      if (!payments.length) {
+        return res.status(404).json({ message: "No tax payments found." });
+      }
+  
+      return res.status(200).json({ payments });
+    } catch (error) {
+      console.error("Get tax payments error:", error);
+      return res.status(500).json({ message: "Internal server error." });
+    }
+  };
+
+
+  // Controller: Get Tax Documents
+exports.getTaxDocuments = async (req, res) => {
+    try {
+      const userId = req.user._id;
+      const { taxYear, type } = req.query;
+  
+      // Build query
+      let query = { userId };
+      if (taxYear) query.taxYear = taxYear;
+      if (type) query.type = type;
+  
+      const documents = await TaxDocument.find(query)
+        .select('_id type documentUrl taxYear') // Only select required fields
+        .exec();
+  
+      if (!documents.length) {
+        return res.status(404).json({ message: "No tax documents found." });
+      }
+  
+      return res.status(200).json({ documents });
+    } catch (error) {
+      console.error("Get tax documents error:", error);
+      return res.status(500).json({ message: "Internal server error." });
     }
   };

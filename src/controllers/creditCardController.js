@@ -165,3 +165,77 @@ exports.payCreditCardBalance = async (req, res) => {
     return res.status(500).json({ message: 'Server error' });
   }
 };
+
+
+// PATCH /admin/credit-card-applications/:id
+exports.updateCreditCardApplication = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, creditLimit } = req.body;
+
+    // 1. Authorization check
+    if (!['admin', 'compliance'].includes(req.user.role)) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+
+    // 2. Find the application
+    const application = await CreditCardApplication.findById(id);
+    if (!application) {
+      return res.status(404).json({ message: 'Application not found' });
+    }
+
+    // 3. Update application status
+    application.status = status;
+    if (status === 'approved') {
+      application.approvedAt = new Date();
+    }
+    await application.save();
+
+    // 4. If approved, create VirtualCard
+    if (status === 'approved') {
+      const maskedCardNumber = generateMaskedCardNumber(); // e.g., "****1234"
+      const newCard = await VirtualCard.create({
+        userId: application.userId,
+        cardNumber: maskedCardNumber,
+        cardHolder: req.user.name || "System",
+        cardType: "Visa", // Or dynamic
+        cvv: "encrypted-cvv", // encrypt and store properly
+        expiryDate: generateExpiryDate(), // e.g., 3 years from now
+        creditLimit: creditLimit,
+        balance: 0,
+        status: "active",
+        network: "Visa", // or MasterCard
+      });
+
+      // Optional: Send notification to the user
+      await sendNotification(application.userId, `Your credit card application was approved!`);
+
+      // Log creation (optional)
+      await AuditLog.create({
+        performed_by: req.user.id,
+        action: `Approved credit card application and issued card ${newCard._id}`,
+        entity_id: application._id,
+        entity_type: 'CreditCardApplication',
+        details: "Your credit card has been approved",
+        timestamp: new Date(),
+      });
+    }
+
+    return res.status(200).json({ message: 'Application updated' });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Helpers (example only)
+function generateMaskedCardNumber() {
+  const last4 = Math.floor(1000 + Math.random() * 9000).toString();
+  return `****${last4}`;
+}
+
+function generateExpiryDate() {
+  const now = new Date();
+  return `${now.getMonth() + 1}/${now.getFullYear() + 3}`; // 3 years from today
+}

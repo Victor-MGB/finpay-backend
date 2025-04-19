@@ -1,4 +1,4 @@
-const {LoanApplication, Wallet, Transaction,  Loan, User, AuditLog, Notification, TransactionFee} = require('../models/Users');
+const {LoanApplication, Wallet, Transaction,  Loan, User, AuditLog, Notification, TransactionFee, EligibilityCheck} = require('../models/Users');
 // const mongoose = require('mongoose');
 const {v4: uuidv4} = require("uuid");
 
@@ -399,5 +399,99 @@ exports.getUserLoans = async (req, res) => {
   } catch (err) {
     console.error("Error fetching user loans:", err);
     res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+exports.checkEligibility = async (req, res) => {
+  const { type, creditScore, income } = req.body;
+
+  if (!type || !creditScore || !income) {
+    return res.status(400).json({ message: "Invalid type or missing fields." });
+  }
+
+  // Validate the type
+  if (!["loan", "credit_card"].includes(type)) {
+    return res.status(400).json({ message: "Invalid type. Must be 'loan' or 'credit_card'." });
+  }
+
+  // Eligibility criteria
+  let eligibilityStatus = "ineligible";
+  let preApprovedAmount = 0;
+
+  if (creditScore > 650 && income > 30000) {
+    eligibilityStatus = "eligible";
+    preApprovedAmount = type === "loan" ? 10000 : 5000; // Example amounts
+  }
+
+  try {
+    // Create the eligibility check record
+    const eligibilityCheck = new EligibilityCheck({
+      userId: req.user.id,
+      type,
+      creditScore,
+      income,
+      eligibilityStatus,
+      preApprovedAmount,
+    });
+
+    await eligibilityCheck.save();
+
+    // Log the action in AuditLog
+    const auditLog = new AuditLog({
+      performed_by: req.user.id,
+      action: `Checked eligibility for ${type}`,
+      entity_type: "EligibilityCheck",
+      entity_id: eligibilityCheck._id,
+      details: `Eligibility Status: ${eligibilityStatus}, Pre-approved Amount: ${preApprovedAmount}`,
+    });
+    await auditLog.save();
+
+    // Notify user
+    const notificationMessage = `Your eligibility for a ${type} has been determined. Status: ${eligibilityStatus}. Pre-approved Amount: ${preApprovedAmount}.`;
+    const notification = new Notification({
+      userId: req.user.id,
+      message: notificationMessage,
+    });
+    await notification.save();
+
+    // Success response
+    return res.status(201).json({
+      checkId: eligibilityCheck._id,
+      eligibilityStatus,
+      preApprovedAmount,
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
+  }
+};
+
+
+exports.getEligibilityCheckHistory = async (req, res) => {
+  const { type } = req.query;
+
+  try {
+    // Build the query
+    const query = { userId: req.user.id };
+    if (type) {
+      query.type = type;
+    }
+
+    // Fetch eligibility check history for the user
+    const eligibilityChecks = await EligibilityCheck.find(query)
+      .sort({ checkedAt: -1 }) // Sort by checkedAt in descending order
+      .select("_id type eligibilityStatus preApprovedAmount checkedAt");
+
+    if (eligibilityChecks.length === 0) {
+      return res.status(404).json({ message: "No eligibility check history found." });
+    }
+
+    // Success response
+    return res.status(200).json({ checks: eligibilityChecks });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 };

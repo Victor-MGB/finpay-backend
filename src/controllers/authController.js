@@ -510,3 +510,48 @@ exports.updateAlerts = async (req, res) => {
     return res.status(500).json({ message: "Internal server error", error: error.message });
   }
 };
+
+
+exports.deactivateAccount = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId);
+
+    // Check if user exists
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Check if user is already suspended or disabled
+    if (user.status === "suspended" || user.disabled) {
+      return res.status(400).json({ message: "Account already deactivated" });
+    }
+
+    // Update user status and disable account
+    user.status = "suspended";
+    user.disabled = true;
+
+    // Invalidate sessions by removing refresh token (if necessary, or use other methods)
+    user.refreshToken = null; // Example: invalidate refresh token
+
+    await user.save();
+
+    // Log the deactivation action in SecurityLog
+    const securityLog = new SecurityLog({
+      userId: user._id,
+      action: "account_deactivated",
+      status: "success",
+      ipAddress: req.ip, // Can also get from `req.headers['x-forwarded-for']` if behind proxies
+      userAgent: req.headers['user-agent'],
+      location: user.location, // You can use IP lookup for location
+      details: "User account was deactivated"
+    });
+
+    await securityLog.save();
+
+    return res.status(200).json({ message: "Account deactivated" });
+  } catch (error) {
+    console.error("Error deactivating account:", error);
+    return res.status(500).json({ message: "Internal server error", error: error.message });
+  }
+};

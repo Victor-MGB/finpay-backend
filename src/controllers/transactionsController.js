@@ -432,30 +432,39 @@ exports.transferFunds = async (req, res) => {
 
   exports.listTransactions = async (req, res) => {
     try {
-      const userId = req.user._id; // Authenticated user
-      const { status, type, currency, page = 1, limit = 10 } = req.query; // Pagination + Filters
+      const userId = req.user._id;
+      const { walletId, type, status, startDate, endDate, page = 1, limit = 10 } = req.query;
   
       const query = {
         $or: [{ senderId: userId }, { receiverId: userId }],
       };
   
-      // Apply filters if provided
-      if (status) query.status = status;
+      // Apply filters
+      if (walletId) query.walletId = walletId;
       if (type) query.type = type;
-      if (currency) query.currency = currency;
+      if (status) query.status = status;
+  
+      // Date range filter
+      if (startDate || endDate) {
+        query.createdAt = {};
+        if (startDate) query.createdAt.$gte = new Date(startDate);
+        if (endDate) query.createdAt.$lte = new Date(endDate);
+      }
   
       const pageNumber = parseInt(page);
-      const limitNumber = parseInt(limit);
+      const limitNumber = Math.min(parseInt(limit), 100); // Max 100 per page
   
-      // Fetch transactions with pagination & payment method details
       const transactions = await Transaction.find(query)
         .populate("paymentMethodId")
-        .sort({ createdAt: -1 }) // Sort newest first
-        .skip((pageNumber - 1) * limitNumber) // Skip previous pages
-        .limit(limitNumber); // Limit results per page
+        .sort({ createdAt: -1 }) // Newest first
+        .skip((pageNumber - 1) * limitNumber)
+        .limit(limitNumber);
   
-      // Count total transactions for pagination info
       const totalTransactions = await Transaction.countDocuments(query);
+  
+      if (!transactions.length) {
+        return res.status(404).json({ message: "No transactions found" });
+      }
   
       return res.status(200).json({
         transactions,
@@ -471,46 +480,56 @@ exports.transferFunds = async (req, res) => {
       console.error("Error fetching transactions:", error);
       return res.status(500).json({ message: "Internal Server Error" });
     }
-  };
-
+  };  
 
   //get a specific user Id
   exports.getTransactionById = async (req, res) => {
-    try{
-        const userId = req.user._id; // Authenticated user
-        const { Id } = req.params; //Transaction ID from URl
-
-        //Fetch transaction & populate related fields
-        const transaction = await Transaction.findById(id)
-      .populate("senderId", "name email") // Fetch sender details
-      .populate("receiverId", "name email") // Fetch receiver details
-      .populate("paymentMethodId") // Fetch payment method details
-      .lean(); // Convert Mongoose document to plain JSON object
-
-      if(!transaction){
-        return res.status(404).json({message: "Transaction not found"});
+    try {
+      const userId = req.user._id; // Authenticated user
+      const { id } = req.params; // Transaction ID from URL
+  
+      // Fetch transaction and populate related fields
+      const transaction = await Transaction.findById(id)
+        .populate("senderId", "name email") // Fetch sender details
+        .populate("receiverId", "name email") // Fetch receiver details
+        .populate("paymentMethodId") // Fetch payment method details
+        .lean(); // Convert Mongoose document to plain JSON object
+  
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
       }
-
-      //Ensure the user is involved in the transaction
+  
+      // Ensure the user is involved in the transaction
       if (
         transaction.senderId._id.toString() !== userId.toString() &&
         transaction.receiverId._id.toString() !== userId.toString()
       ) {
-        return res.status(403).json({ message: "Unauthorized to view this transaction." });
+        return res.status(403).json({ message: "Unauthorized to view this transaction" });
       }
-
-      //Fetch transaction fees related to this transaction
+  
+      // Fetch transaction fees related to this transaction
       const transactionFees = await TransactionFee.find({ transactionId: id }).lean();
-
-      //Add fess to transaction response
-        transaction.fees = transactionFees;
-    }catch(error){
-        console.error("Error fetching transaction:", error);
-        return res.status(500).json({ message: "Internal Server Error" });
+  
+      // Add fees to transaction response
+      transaction.fees = transactionFees;
+  
+      // Respond with the transaction details
+      return res.status(200).json({
+        _id: transaction._id,
+        type: transaction.type,
+        amount: transaction.amount,
+        currency: transaction.currency,
+        status: transaction.status,
+        description: transaction.description,
+        metadata: transaction.metadata,
+        fees: transaction.fees,
+      });
+  
+    } catch (error) {
+      console.error("Error fetching transaction:", error);
+      return res.status(500).json({ message: "Internal Server Error" });
     }
-    }
-
-
+  };  
 
     //externally off point
     exports.P2P = async (req, res) => {

@@ -294,7 +294,7 @@ const AuditLogSchema = new mongoose.Schema({
   action: { type: String, required: true }, // Description of the action (e.g., "User status update")
   entity_type: {
     type: String,
-    enum: ["User", "Transaction", "Account", "Currency"],
+    enum: ["User", "Transaction", "Account", "Currency", "Location"],
     required: true,
   }, // Type of entity affected
   entity_id: {

@@ -38,68 +38,76 @@ exports.sendUpdatesToUsers = async (req, res) => {
 }
 
 exports.listUsers = async (req, res) => {
-    try {
-      const admin = req.user;
-  
-      if (admin.role !== "admin" && admin.role !== "superadmin") {
-        return res.status(403).json({
-          success: false,
-          message: "Access denied. Admins only.",
-        });
-      }
-  
-      const {
-        status,
-        role,
-        startDate,
-        endDate,
-        page = 1,
-        limit = 10,
-      } = req.query;
-  
-      const filter = {};
-  
-      if (status) filter.status = status;
-      if (role) filter.role = role;
-  
-      // Date filter (createdAt range)
-      if (startDate || endDate) {
-        filter.createdAt = {};
-        if (startDate) filter.createdAt.$gte = new Date(startDate);
-        if (endDate) filter.createdAt.$lte = new Date(endDate);
-      }
-  
-      const skip = (parseInt(page) - 1) * parseInt(limit);
-  
-      const [users, totalUsers] = await Promise.all([
-        User.find(filter)
-          .select("fullName email status kycVerified createdAt")
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(parseInt(limit)),
-        User.countDocuments(filter),
-      ]);
-  
-      const totalPages = Math.ceil(totalUsers / limit);
-  
-      return res.status(200).json({
-        success: true,
-        message: "Users retrieved successfully",
-        meta: {
-          totalUsers,
-          totalPages,
-          currentPage: parseInt(page),
-        },
-        data: users,
-      });
-    } catch (err) {
-      console.error("Error listing users:", err);
-      return res.status(500).json({
+  try {
+    const admin = req.user;
+
+    // Only allow admin, superadmin, and compliance (optional - add compliance if needed)
+    const allowedRoles = ["admin", "superadmin", "compliance"];
+    if (!allowedRoles.includes(admin.role)) {
+      return res.status(403).json({
         success: false,
-        message: "Failed to retrieve users",
+        message: "Access denied. Admins only.",
       });
     }
-  };
+
+    const {
+      status,
+      role,
+      startDate,
+      endDate,
+      page = 1,
+      limit = 10,
+    } = req.query;
+
+    const filter = {};
+
+    if (status) filter.status = status;
+    if (role) filter.role = role;
+
+    // Date filter (createdAt range)
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate);
+      if (endDate) filter.createdAt.$lte = new Date(endDate);
+    }
+
+    const parsedPage = parseInt(page, 10) || 1;
+    const parsedLimit = parseInt(limit, 10) || 10;
+    const skip = (parsedPage - 1) * parsedLimit;
+
+    // Fetch users and total count in parallel
+    const [users, totalUsers] = await Promise.all([
+      User.find(filter)
+        .select("_id fullName email role status kycVerified createdAt")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parsedLimit)
+        .lean(), // Add .lean() for better performance if no virtuals are needed
+      User.countDocuments(filter),
+    ]);
+
+    const totalPages = Math.ceil(totalUsers / parsedLimit);
+
+    return res.status(200).json({
+      success: true,
+      message: "Users retrieved successfully",
+      meta: {
+        totalUsers,
+        totalPages,
+        currentPage: parsedPage,
+        pageSize: parsedLimit,
+      },
+      data: users,
+    });
+  } catch (err) {
+    console.error("Error listing users:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve users",
+      error: err.message,
+    });
+  }
+};
   
   exports.updateKycStatus = async (req, res) => {
     try {
@@ -209,5 +217,87 @@ exports.listUsers = async (req, res) => {
     } catch (err) {
       console.error("Error updating user role:", err);
       return res.status(500).json({ message: "Internal server error" });
+    }
+  };
+
+
+  exports.updateUserStatus = async (req, res) => {
+    try {
+      const admin = req.user;
+      const { id } = req.params;
+      const { status } = req.body;
+  
+      const allowedRoles = ["admin", "superadmin"];
+      if (!allowedRoles.includes(admin.role)) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. Admins only.",
+        });
+      }
+  
+      const validStatuses = ["active", "inactive", "suspended"];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid status value.",
+        });
+      }
+  
+      const user = await User.findById(id);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found.",
+        });
+      }
+  
+      if (user.role === "superadmin") {
+        return res.status(403).json({
+          success: false,
+          message: "Cannot modify a superadmin account.",
+        });
+      }
+  
+      if (user.role === "admin" && admin.role !== "superadmin") {
+        return res.status(403).json({
+          success: false,
+          message: "Only superadmin can modify an admin.",
+        });
+      }
+  
+      user.status = status;
+      await user.save();
+  
+      // Log to AuditLog
+      await AuditLog.create({
+        performed_by: admin._id,
+        action: `Updated user status to ${status}`,
+        entity_type: "User",
+        entity_id: user._id,
+        details: `Admin (${admin.fullName}) changed status of user (${user.fullName}) to ${status}`,
+      });
+  
+      // Send SMS Notification via Twilio
+      if (user.phoneNumber) {
+        const message = `Hello ${user.fullName}, your account status has been updated to: ${status}.`;
+        
+        await client.messages.create({
+          body: message,
+          to: user.phoneNumber, // Must be a complete number like +234xxxxxxxxxx
+          from: process.env.TWILIO_PHONE_NUMBER, // Your Twilio number
+        });
+      }
+  
+      return res.status(200).json({
+        success: true,
+        message: "User status updated successfully.",
+      });
+    } catch (err) {
+      console.error("Error updating user status:", err);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to update user status.",
+        error: err.message,
+      });
     }
   };

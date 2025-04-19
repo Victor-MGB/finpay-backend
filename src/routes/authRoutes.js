@@ -5,6 +5,7 @@ const {
   resendOTP,
   loginUser,
   enableBiometric,
+  deactivateAccount
 } = require("../controllers/authController");
 const { authMiddleware } = require("../middlewares/authMiddleware"); // assumes you have authentication middleware
 const router = express.Router();
@@ -22,5 +23,7 @@ router.post("/resend-otp", resendOTP);
 router.post("/login", loginUser);
 
 router.patch('/users/biometric', authMiddleware, enableBiometric);
+
+router.patch('/users/deactivate', authMiddleware, deactivateAccount);
 
 module.exports = router;

@@ -8,7 +8,9 @@ const {
   getLoanStats,
   getLoanApplications,
   getUserLoans,
-  payLoanInstallment
+  payLoanInstallment,
+  checkEligibility,
+  getEligibilityCheckHistory
 } = require("../controllers/loanController");
 const { authMiddleware } = require("../middlewares/authMiddleware"); // Assuming JWT middleware
 
@@ -42,5 +44,8 @@ router.get(
 
   router.post("/loans/:id/pay", authMiddleware, payLoanInstallment);
 
+  router.post("/eligibility-check", authMiddleware, checkEligibility)
+
+  router.get("/eligibilty-check", authMiddleware, getEligibilityCheckHistory)
 
 module.exports = router;
