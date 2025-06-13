@@ -90,7 +90,7 @@ app.get("/", (req, res) => {
 // Routes
 app.use("/api/auth", require("./src/routes/authRoutes"));
 app.use("/api/users", require("./src/routes/userRoutes"));
-app.use("/api/kyc", require("./src/routes/kycRoutes"));
+// app.use("/api/kyc", require("./src/routes/kycRoutes"));
 app.use("/api/invoice", require("./src/routes/invoiceRoutes"));
 app.use("/api/admin", require("./src/routes/adminRoutes"));
 app.use("/api/wallet", require("./src/routes/walletRoutes"));
