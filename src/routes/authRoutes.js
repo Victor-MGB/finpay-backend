@@ -104,6 +104,52 @@ router.post("/register", registerUser);
 router.post("/verify-phone-otp", verifyOTPFromPhoneNumber);
 
 //Resend OTP endpoint
+/**
+ * @swagger
+ * /resend-otp:
+ *   post:
+ *     summary: Resend a new OTP to the user
+ *     tags:
+ *       - Auth
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *             properties:
+ *               userId:
+ *                 type: string
+ *                 example: 64a1f7b3d8b7d8a9f1f5f2a7
+ *     responses:
+ *       200:
+ *         description: New OTP sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: New OTP sent successfully!
+ *                 otp:
+ *                   type: string
+ *                   example: "123456"
+ *       404:
+ *         description: User not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: User not found
+ *       500:
+ *         description: Internal server error
+ */
 router.post("/resend-otp", resendOTP);
 
 //Login endpoint
