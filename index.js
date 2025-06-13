@@ -11,7 +11,7 @@ const morgan = require("morgan");
 const winston = require("winston");
 const swaggerUi = require("swagger-ui-express");
 const swaggerJsdoc = require("swagger-jsdoc");
-const birthdayJob  = require("./src/cron/cronjobs"); // Import cron job for birthday notifications
+// const birthdayJob  = require("./src/cron/cronjobs"); // Import cron job for birthday notifications
 // const { sendBirthdayNotifications } = require("./src/cron/cronjobs"); // Import function to send birthday notifications
 // require("./src/cron/cronJobs"); // Import cron jobs
 
@@ -115,11 +115,11 @@ app.use("api/sip", require("./src/routes/sipRoutes"));
 app.use("api/insurance", require("./src/routes/insuranceRoutes"));
 app.use("api/tax", require("./src/routes/taxRoutes"));
 
-// 🟢 Cron Jobs
-if (process.env.NODE_ENV !== 'test') {
-  // birthdayJob.start(); // Start the birthday notification cron job
-  logger.info("✅ Birthday notification cron job started.");
-}
+// // 🟢 Cron Jobs
+// if (process.env.NODE_ENV !== 'test') {
+//   // birthdayJob.start(); // Start the birthday notification cron job
+//   logger.info("✅ Birthday notification cron job started.");
+// }
 //stripe webhook
 app.use("/api/stripe", require("./src/routes/stripeWebhook"));
 
