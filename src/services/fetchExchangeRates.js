@@ -23,5 +23,6 @@ async function updateExchangeRates() {
 }
 
 // Run the function once a day
-setInterval(updateExchangeRates, 24 * 60 * 60 * 1000);
-module.exports = updateExchangeRates;
+const exchangeRateInterval = setInterval(updateExchangeRates, 24 * 60 * 60 * 1000);
+module.exports = { updateExchangeRates, exchangeRateInterval };
+

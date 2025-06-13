@@ -9,6 +9,8 @@ const mongoSanitize = require("express-mongo-sanitize");
 const connectDB = require("./src/config/db");
 const morgan = require("morgan");
 const winston = require("winston");
+const swaggerUi = require("swagger-ui-express");
+const swaggerJsdoc = require("swagger-jsdoc");
 
 require("./src/cron/cronjobs");
 
@@ -36,6 +38,22 @@ if (process.env.NODE_ENV !== "production") {
   );
 }
 
+const options = {
+  definition: {
+    openapi: "3.0.0",
+    info: {
+      title: "FinPay API",
+      version: "1.0.0",
+      description: "API documentation for FinPay application",
+    },
+  },
+  apis: ["./src/routes/*.js"], // Path to the API docs
+};
+
+const swaggerSpec = swaggerJsdoc(options);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+
 // 🟢 Middleware: Basic Security
 app.use(helmet()); // Set security headers
 app.use(cors()); // Enable CORS
@@ -62,6 +80,11 @@ app.use(limiter);
 
 // Connect to MongoDB
 connectDB();
+
+app.get("/", (req, res) => {
+  res.status(200).json({ message: "Welcome to FinPay API" });
+});
+
 
 // Routes
 app.use("/api/auth", require("./src/routes/authRoutes"));
@@ -102,4 +125,11 @@ app.use((err, req, res, next) => {
 
 // Start the server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => logger.info(`Server running on port ${PORT}`));
+
+app.listen(PORT, () => {
+  logger.info(`Server running on port ${PORT}`)
+    console.log(`Swagger docs available at http://localhost:${PORT}/api-docs`);
+});
+
+
+module.exports = app;

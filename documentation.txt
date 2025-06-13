@@ -1,0 +1,183 @@
+##User Registration
+1. Input Extraction
+The function begins by extracting four key fields from the request body:
+
+fullName
+
+email
+
+phone
+
+password
+
+2. Input Validation
+It checks whether any of the required fields are missing. If any field is not provided, it responds with a 400 status and a message indicating that all fields are required.
+
+3. Phone Number Validation and Normalization
+The function uses the libphonenumber-js library to parse and validate the phone number.
+
+If the phone number is invalid, it responds with a 400 status and an appropriate error message.
+
+If valid, it normalizes the number into E.164 international format (e.g., +234XXXXXXXXXX) for consistency.
+
+The country code is also extracted from the phone number (e.g., NG for Nigeria).
+
+4. Email Validation
+The email is validated using the validator library to ensure it conforms to standard email format.
+
+If the email is invalid, the server returns a 400 status with an error message.
+
+5. Check for Existing User
+The database is queried using the User model to check if a user with the provided email or normalized phone number already exists.
+
+If a match is found, a 409 Conflict status is returned, indicating that the user is already registered.
+
+6. Password Hashing
+If the email and phone are unique, the password is hashed using the bcrypt library with a salt round of 10. This step secures the password by making it unreadable in the database.
+
+7. IP Address and Geolocation
+The user's IP address is obtained from the request headers (x-forwarded-for) or directly from req.ip.
+
+This IP is used to call a function named getGeoLocation, which retrieves geolocation data such as:
+
+Country code (from IP)
+
+Location (city and country)
+
+8. OTP Generation
+A 6-digit numeric One-Time Password (OTP) is generated using the otp-generator library.
+
+It excludes uppercase letters, alphabets, and special characters—using only digits.
+
+This OTP is intended for verifying the user and expires after 10 minutes from the time of generation.
+
+9. User Object Creation
+A new user object is instantiated with the following data:
+
+fullName, email, and normalized phone
+
+The hashed password
+
+countryCode (from phone number)
+
+ipCountryCode and location (from IP geolocation)
+
+The generated otp and its expiry time
+
+isVerified set to false (pending OTP/email verification)
+
+status set to "active" (account is enabled by default)
+
+disabled set to false (account is not disabled)
+
+10. User Data Persistence
+The new user object is saved to the database using Mongoose's save() method.
+
+11. OTP Delivery
+The generated OTP is sent to the user’s normalized phone number via SMS using Twilio’s messaging service.
+
+The message includes the OTP with instructions to use it for verification.
+
+12. JWT Token Generation
+A JWT (JSON Web Token) is generated containing the user's unique ID (userId).
+
+The token is signed with a secret key and configured to expire in 1 hour.
+
+This token can be used for verifying the user's email.
+
+13. Logging the Registration in Security Logs
+A security log entry is created with the following data:
+
+userId: The newly registered user's ID
+
+action: "User Registration"
+
+status: "success"
+
+ipAddress: The user’s IP address
+
+userAgent: The client's browser/user agent string
+
+location: The geolocation derived from the IP
+
+14. Response to Client
+A success response is returned with HTTP status 201.
+
+The response contains:
+
+A message indicating that registration was successful and verification is required
+
+The JWT token (for email verification)
+
+A user object with key public details like id, fullName, email, phone, countryCode, ipCountryCode, location, otp, isVerified, status, and disabled
+
+The security log object, which confirms that the registration event was logged
+
+15. Error Handling
+If any unexpected error occurs during any step, the error is logged to the console.
+
+A 500 Internal Server Error response is returned with a message indicating that something went wrong on the server side.
+
+
+
+
+
+Documentation: verifyOTPFromPhoneNumber Endpoint
+The verifyOTPFromPhoneNumber function is a backend controller responsible for verifying a One-Time Password (OTP) sent to a user's phone during the account registration or login process. Here's a comprehensive step-by-step breakdown of what this function does:
+
+1. Input Retrieval
+The function begins by extracting the userId and otp (the code submitted by the user) from the request body.
+
+2. User Lookup
+It attempts to find a user in the database using the provided userId:
+
+If no user is found, it returns a 400 Bad Request response with a message indicating that the user was not found.
+
+3. Maximum OTP Attempts Check
+Before checking the OTP itself, the system ensures that the user has not exceeded the maximum number of allowed OTP attempts (maxOtpAttempts):
+
+If the attempts have been exceeded, the user account is disabled by setting user.disabled = true.
+
+The system then saves this change to the database and returns a response warning the user that their account has been disabled due to too many failed attempts.
+
+4. OTP Expiry Check
+If the user is valid and has not exceeded the maximum attempts:
+
+The system checks whether the OTP has expired by comparing the current time with the otpExpiresAt timestamp stored in the user’s record.
+
+If the OTP is expired or missing, it responds with a message prompting the user to request a new OTP.
+
+5. OTP Validation
+If the OTP is still valid:
+
+The submitted OTP is compared to the one stored in the user’s record.
+
+If the OTPs do not match:
+
+The user's otpAttempts count is incremented.
+
+This change is saved, and the user is informed that the OTP is invalid and they should try again.
+
+6. Successful Verification
+If the submitted OTP matches the stored one:
+
+The OTP and its expiry time are cleared from the database.
+
+The otpAttempts count is reset to 0.
+
+The user is marked as verified by setting isVerified = true.
+
+The updated user information is saved to the database.
+
+7. Response
+Once the OTP is successfully verified:
+
+A 200 OK response is sent back to the client with a success message and a confirmation that the user is verified.
+
+8. Error Handling
+If any unexpected server error occurs during the process:
+
+It is logged to the console.
+
+The system returns a 500 Internal Server Error response with a generic error message to the client.
+

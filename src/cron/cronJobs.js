@@ -1,7 +1,6 @@
 const cron = require('node-cron');
 const sendEmail = require('../utils/sendEmail');
 const { User } = require('../models/Users');
-const mongoose = require('mongoose');
 
 async function sendBirthdayNotifications() {
     try {
@@ -39,9 +38,17 @@ async function sendBirthdayNotifications() {
 }
 
 // Schedule cron job to run at 12:00 AM every day
-cron.schedule('0 0 * * *', async () => {
+let birthdayJob = null;
+
+birthdayJob = cron.schedule('0 0 * * *', async () => {
     console.log('🎂 Running birthday notification cron job...');
     await sendBirthdayNotifications();
-});
+  }, { scheduled: false }); // << don't auto-start
+  
+  if (process.env.NODE_ENV !== 'test') {
+    birthdayJob.start();
+    console.log("✅ Birthday notification cron job scheduled.");
+  }
+  
 
-console.log("✅ Birthday notification cron job scheduled.");
+module.exports = {birthdayJob};
