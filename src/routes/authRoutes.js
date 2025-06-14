@@ -14,7 +14,7 @@ const router = express.Router();
 // Register endpoint
 /**
  * @swagger
- * /register:
+ * /api/auth/register:
  *   post:
  *     summary: Register a new user
  *     tags:
@@ -54,7 +54,7 @@ router.post("/register", registerUser);
 //Verify OTP endpoint
 /**
  * @swagger
- * /verify-phone-otp:
+ * api/auth/verify-phone-otp:
  *   post:
  *     summary: Verify user's phone number using OTP
  *     tags:
@@ -107,7 +107,7 @@ router.post("/verify-phone-otp", verifyOTPFromPhoneNumber);
 //Resend OTP endpoint
 /**
  * @swagger
- * /resend-otp:
+ * api/auth/resend-otp:
  *   post:
  *     summary: Resend a new OTP to the user
  *     tags:
@@ -156,7 +156,7 @@ router.post("/resend-otp", resendOTP);
 //Login endpoint
 /**
  * @swagger
- * /login:
+ * api/auth/login:
  *   post:
  *     summary: Log in a user
  *     tags:
@@ -250,7 +250,7 @@ router.post("/login", loginUser);
 
 /**
  * @swagger
- * /users/biometric:
+ * api/auth/users/biometric:
  *   patch:
  *     summary: Enable or disable biometric login
  *     tags: [Auth]
@@ -307,7 +307,7 @@ router.patch('/users/biometric', authMiddleware, enableBiometric);
 
 /**
  * @swagger
- * /users/deactivate:
+ * api/auth/users/deactivate:
  *   patch:
  *     summary: Deactivate the currently logged-in user's account
  *     tags: [Auth]
@@ -359,7 +359,7 @@ router.patch('/users/deactivate', authMiddleware, deactivateAccount);
 
 /**
  * @swagger
- * /users/alerts:
+ * api/auth/update-alerts:
  *   patch:
  *     summary: Update user alert preferences
  *     tags: [User Settings]
